@@ -1,6 +1,10 @@
 document.addEventListener('DOMContentLoaded', () => {
     const app = document.getElementById('app-content');
     const canvas = document.getElementById('box-canvas');
+    const ctx = canvas ? canvas.getContext('2d') : null;
+    if (!app || !canvas || !ctx) {
+        return;
+    }
     const visualWrapper = document.querySelector('.visual-wrapper');
     const fallbackContainer = document.querySelector('.container');
     const sizingElement = visualWrapper || fallbackContainer;
@@ -18,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
         timeLimitReached: false,
         phaseTime: 4,
         pulseStartTime: null,
-        devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
+        devicePixelRatio: Math.min(window.devicePixelRatio || 1, 1.75),
         viewportWidth: initialWidth,
         viewportHeight: initialHeight,
         prefersReducedMotion: false,
@@ -64,9 +68,10 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const width = currentSizingElement.clientWidth;
-        const height = currentSizingElement.clientHeight;
-        const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
+        const rect = currentSizingElement.getBoundingClientRect();
+        const width = rect.width;
+        const height = rect.height;
+        const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.75);
 
         state.viewportWidth = width;
         state.viewportHeight = height;
@@ -77,7 +82,6 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.width = Math.floor(width * pixelRatio);
         canvas.height = Math.floor(height * pixelRatio);
 
-        const ctx = canvas.getContext('2d');
         if (ctx) {
             ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
         }
@@ -182,6 +186,12 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             clearInterval(interval);
             cancelAnimationFrame(animationFrameId);
+            state.totalTime = 0;
+            state.countdown = state.phaseTime;
+            state.count = 0;
+            state.sessionComplete = false;
+            state.timeLimitReached = false;
+            state.hasStarted = false;
             drawScene({ progress: 0, showTrail: false, phase: state.count });
             state.pulseStartTime = null;
             releaseWakeLock();
@@ -256,6 +266,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (state.count === 3 && state.timeLimitReached) {
                     state.sessionComplete = true;
                     state.isPlaying = false;
+                    state.hasStarted = false;
                     clearInterval(interval);
                     cancelAnimationFrame(animationFrameId);
                     releaseWakeLock();
@@ -268,8 +279,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1000);
     }
 
+    let cachedGradient = null;
+    let cachedGradientKey = '';
+
     function drawScene({ progress = 0, phase = state.count, showTrail = state.isPlaying, timestamp = performance.now() } = {}) {
-        const ctx = canvas.getContext('2d');
         if (!ctx) return;
 
         const width = state.viewportWidth || canvas.clientWidth || canvas.width;
@@ -331,17 +344,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const accentColor = phaseColors[phase] || '#f97316';
         const shouldShowTrail = allowMotion && showTrail;
 
-        const gradient = ctx.createRadialGradient(
-            adjustedLeft + size / 2,
-            adjustedTop + size / 2,
-            size * 0.2,
-            adjustedLeft + size / 2,
-            adjustedTop + size / 2,
-            size
-        );
-        gradient.addColorStop(0, hexToRgba(accentColor, 0.18));
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        ctx.fillStyle = gradient;
+        const gradientKey = `${Math.round(size * 100)}-${accentColor}-${Math.round(adjustedLeft)}-${Math.round(adjustedTop)}`;
+        if (!cachedGradient || cachedGradientKey !== gradientKey) {
+            cachedGradient = ctx.createRadialGradient(
+                adjustedLeft + size / 2,
+                adjustedTop + size / 2,
+                size * 0.2,
+                adjustedLeft + size / 2,
+                adjustedTop + size / 2,
+                size
+            );
+            cachedGradient.addColorStop(0, hexToRgba(accentColor, 0.18));
+            cachedGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+            cachedGradientKey = gradientKey;
+        }
+        ctx.fillStyle = cachedGradient;
         ctx.fillRect(0, 0, width, height);
 
         ctx.strokeStyle = hexToRgba('#fcd34d', 0.25);
@@ -384,7 +401,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateCanvasVisibility() {
-        const shouldShow = state.hasStarted || state.sessionComplete;
+        const shouldShow = state.isPlaying;
         canvas.classList.toggle('is-visible', shouldShow);
     }
 
