@@ -5,11 +5,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!app || !canvas || !ctx) {
         return;
     }
-    const visualWrapper = document.querySelector('.visual-wrapper');
-    const fallbackContainer = document.querySelector('.container');
-    const sizingElement = visualWrapper || fallbackContainer;
-    const initialWidth = sizingElement ? sizingElement.clientWidth : 0;
-    const initialHeight = sizingElement ? sizingElement.clientHeight : 0;
+    const layoutHost = canvas.parentElement || document.querySelector('.container');
+    const initialWidth = layoutHost ? layoutHost.clientWidth : canvas.clientWidth;
+    const initialHeight = layoutHost ? layoutHost.clientHeight : canvas.clientHeight;
 
     const state = {
         isPlaying: false,
@@ -63,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resizeCanvas() {
-        const currentSizingElement = visualWrapper || fallbackContainer;
+        const currentSizingElement = layoutHost || document.body;
         if (!currentSizingElement) {
             return;
         }
@@ -304,7 +302,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const clampedProgress = Math.max(0, Math.min(1, progress));
         const easedProgress = 0.5 - (Math.cos(Math.PI * clampedProgress) / 2);
-        const baseSquareSize = Math.min(width, height) * 0.72;
+        const baseSize = Math.min(width, height) * 0.6;
+        const topMargin = 20;
+        const sizeWithoutBreath = Math.min(baseSize, height - topMargin * 2);
+        const verticalOffset = Math.min(height * 0.18, 110);
+        const preferredTop = height / 2 + verticalOffset - sizeWithoutBreath / 2;
+        const top = Math.max(topMargin, Math.min(preferredTop, height - sizeWithoutBreath - topMargin));
+        const left = (width - sizeWithoutBreath) / 2;
 
         const now = timestamp;
         const allowMotion = !state.prefersReducedMotion;
@@ -327,9 +331,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        const size = baseSquareSize * (1 + 0.08 * breathInfluence + 0.03 * pulseBoost);
-        const adjustedLeft = (width - size) / 2;
-        const adjustedTop = (height - size) / 2;
+        const size = sizeWithoutBreath * (1 + 0.08 * breathInfluence + 0.03 * pulseBoost);
+        const adjustedLeft = left + (sizeWithoutBreath - size) / 2;
+        const adjustedTop = top + (sizeWithoutBreath - size) / 2;
         const points = [
             { x: adjustedLeft, y: adjustedTop + size },
             { x: adjustedLeft, y: adjustedTop },
@@ -401,7 +405,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateCanvasVisibility() {
-        const shouldShow = state.isPlaying;
+        const shouldShow = state.isPlaying || state.sessionComplete;
         canvas.classList.toggle('is-visible', shouldShow);
     }
 
