@@ -8,25 +8,34 @@
     <title>Box Breathing</title>
     <link rel="manifest" href="manifest.json">
     <style>
+        html, body {
+            height: 100%;
+        }
+
         body {
             font-family: 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
-            padding: 2rem 1rem;
+            padding: calc(env(safe-area-inset-top) + 1.25rem) clamp(1rem, 4vw, 1.75rem) calc(env(safe-area-inset-bottom) + 1.5rem);
             background-color: black;
             color: #ffedd5;
-            min-height: 100vh;
+            min-height: 100%;
+            height: 100vh;
+            min-height: 100svh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             box-sizing: border-box;
-            overflow-x: hidden;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            overscroll-behavior: none;
+            touch-action: manipulation;
         }
 
         /* Offline notification styles */
         #offline-notification {
             position: fixed;
-            top: 10px;
+            top: calc(env(safe-area-inset-top) + 10px);
             left: 50%;
             transform: translateX(-50%);
             background-color: #92400e;
@@ -42,9 +51,17 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: space-between;
-            gap: 2rem;
-            width: min(560px, 100%);
+            justify-content: center;
+            gap: clamp(1rem, 2.5vh, 1.6rem);
+            width: min(460px, 100%);
+            max-height: calc(100vh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 2.5rem);
+            padding: clamp(1.1rem, 2.4vh, 1.6rem) clamp(1.1rem, 4vw, 1.75rem);
+            border-radius: 22px;
+            background: rgba(17, 17, 17, 0.7);
+            border: 1px solid rgba(252, 211, 77, 0.18);
+            box-shadow: 0 22px 48px rgba(0, 0, 0, 0.45);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
         }
 
         #app-content {
@@ -52,6 +69,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
+            gap: clamp(0.75rem, 2vh, 1.25rem);
         }
 
         .info-panel {
@@ -59,14 +77,15 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 1.5rem;
+            gap: clamp(0.75rem, 2.2vh, 1.4rem);
             text-align: center;
         }
 
         .visual-wrapper {
             position: relative;
-            width: min(420px, 90vw);
+            width: min(320px, 70vw, 56vh);
             aspect-ratio: 1 / 1;
+            flex-shrink: 0;
         }
 
         #box-canvas {
@@ -76,6 +95,7 @@
             height: 100%;
             opacity: 0;
             transition: opacity 0.4s ease;
+            pointer-events: none;
         }
 
         #box-canvas.is-visible {
@@ -83,26 +103,26 @@
         }
 
         h1 {
-            font-size: 2.5rem;
+            font-size: clamp(1.8rem, 5vw, 2.4rem);
             font-weight: bold;
             margin: 0;
             color: #fcd34d;
         }
 
         .instruction {
-            font-size: 2rem;
+            font-size: clamp(1.35rem, 4.4vw, 1.85rem);
             color: #fdba74;
         }
 
         .countdown {
-            font-size: 4rem;
+            font-size: clamp(2.6rem, 10vw, 3.4rem);
             font-weight: bold;
             color: #ff6b6b;
         }
 
         .phase-tracker {
             display: flex;
-            gap: 1.5rem;
+            gap: clamp(0.75rem, 2.2vw, 1.25rem);
             flex-wrap: wrap;
             justify-content: center;
         }
@@ -111,11 +131,11 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.35rem;
             opacity: 0.5;
             transform: translateY(0);
             transition: opacity 0.3s ease, transform 0.3s ease;
-            font-size: 1rem;
+            font-size: clamp(0.85rem, 2.4vw, 0.95rem);
             color: #fde68a;
         }
 
@@ -126,8 +146,8 @@
         }
 
         .phase-dot {
-            width: 12px;
-            height: 12px;
+            width: 10px;
+            height: 10px;
             border-radius: 50%;
             border: 2px solid var(--phase-color, #fde68a);
             background-color: var(--phase-soft, rgba(253, 230, 138, 0.2));
@@ -171,12 +191,14 @@
             align-self: flex-end;
             width: 100%;
             text-align: right;
+            font-size: 0.95rem;
+            letter-spacing: 0.05em;
         }
 
         .form-group {
             display: flex;
             align-items: center;
-            margin-bottom: 1rem;
+            margin-bottom: 0.75rem;
             gap: 0.5rem;
         }
 
@@ -184,7 +206,7 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
         }
 
         input[type="number"] {
@@ -203,22 +225,22 @@
         }
 
         button {
-            font-size: 1.25rem;
-            padding: 0.75rem 1.5rem;
-            background: linear-gradient(to bottom, #d97706, #b45309);
+            font-size: clamp(1.05rem, 2.6vw, 1.25rem);
+            padding: 0.65rem 1.4rem;
+            background: linear-gradient(180deg, #d97706 0%, #b45309 100%);
             color: black;
             border: none;
-            border-radius: 0.25rem;
+            border-radius: 0.75rem;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 0.5rem;
-            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
         }
 
         button:hover {
-            background: linear-gradient(to bottom, #b45309, #92400e);
+            background: linear-gradient(180deg, #b45309 0%, #92400e 100%);
         }
 
         .switch {
@@ -281,14 +303,14 @@
         .shortcut-buttons {
             display: flex;
             gap: 0.5rem;
-            margin-top: 1.5rem;
+            margin-top: 1rem;
             flex-wrap: wrap;
             justify-content: center;
         }
 
         .preset-button {
-            font-size: 1rem;
-            padding: 0.5rem 1rem;
+            font-size: 0.95rem;
+            padding: 0.45rem 0.9rem;
             background-color: #92400e;
             color: #ffedd5;
         }
@@ -302,14 +324,14 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            margin-top: 1rem;
-            margin-bottom: 1rem;
+            margin-top: 0.75rem;
+            margin-bottom: 0.75rem;
         }
 
         input[type="range"] {
             -webkit-appearance: none;
             appearance: none;
-            width: 200px;
+            width: min(220px, 60vw);
             height: 10px;
             background: #78350f;
             border-radius: 5px;
@@ -339,32 +361,6 @@
             background: #d97706;
             border-radius: 50%;
             cursor: pointer;
-        }
-
-        @media (max-width: 600px) {
-            body {
-                padding: 1.5rem 1rem;
-            }
-
-            .container {
-                gap: 1.5rem;
-            }
-
-            .visual-wrapper {
-                width: min(360px, 92vw);
-            }
-
-            h1 {
-                font-size: 2.2rem;
-            }
-
-            .instruction {
-                font-size: 1.8rem;
-            }
-
-            .countdown {
-                font-size: 3.5rem;
-            }
         }
 
         @media (prefers-reduced-motion: reduce) {
