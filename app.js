@@ -1,9 +1,11 @@
 document.addEventListener('DOMContentLoaded', () => {
     const app = document.getElementById('app-content');
     const canvas = document.getElementById('box-canvas');
-    const container = document.querySelector('.container');
-    const initialWidth = container.clientWidth;
-    const initialHeight = container.clientHeight;
+    const visualWrapper = document.querySelector('.visual-wrapper');
+    const fallbackContainer = document.querySelector('.container');
+    const sizingElement = visualWrapper || fallbackContainer;
+    const initialWidth = sizingElement ? sizingElement.clientWidth : 0;
+    const initialHeight = sizingElement ? sizingElement.clientHeight : 0;
 
     const state = {
         isPlaying: false,
@@ -19,7 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
         devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
         viewportWidth: initialWidth,
         viewportHeight: initialHeight,
-        prefersReducedMotion: false
+        prefersReducedMotion: false,
+        hasStarted: false
     };
 
     let wakeLock = null;
@@ -56,8 +59,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resizeCanvas() {
-        const width = container.clientWidth;
-        const height = container.clientHeight;
+        const currentSizingElement = visualWrapper || fallbackContainer;
+        if (!currentSizingElement) {
+            return;
+        }
+
+        const width = currentSizingElement.clientWidth;
+        const height = currentSizingElement.clientHeight;
         const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
 
         state.viewportWidth = width;
@@ -160,6 +168,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log('AudioContext resumed');
                 });
             }
+            state.hasStarted = true;
             state.totalTime = 0;
             state.countdown = state.phaseTime;
             state.count = 0;
@@ -189,6 +198,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.timeLimit = '';
         state.timeLimitReached = false;
         state.pulseStartTime = null;
+        state.hasStarted = false;
         clearInterval(interval);
         cancelAnimationFrame(animationFrameId);
         drawScene({ progress: 0, showTrail: false, phase: state.count });
@@ -214,6 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.sessionComplete = false;
         state.timeLimitReached = false;
         state.pulseStartTime = performance.now();
+        state.hasStarted = true;
         if (audioContext && audioContext.state === 'suspended') {
             audioContext.resume().then(() => {
                 console.log('AudioContext resumed');
@@ -271,15 +282,16 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.save();
         ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
+        ctx.clearRect(0, 0, width, height);
+
+        if (!state.hasStarted && !state.sessionComplete) {
+            ctx.restore();
+            return;
+        }
+
         const clampedProgress = Math.max(0, Math.min(1, progress));
         const easedProgress = 0.5 - (Math.cos(Math.PI * clampedProgress) / 2);
-        const baseSize = Math.min(width, height) * 0.5;
-        const topMargin = 20;
-        const sizeWithoutBreath = Math.min(baseSize, height - topMargin * 2);
-        const verticalOffset = Math.min(height * 0.18, 110);
-        const preferredTop = height / 2 + verticalOffset - sizeWithoutBreath / 2;
-        const top = Math.max(topMargin, Math.min(preferredTop, height - sizeWithoutBreath - topMargin));
-        const left = (width - sizeWithoutBreath) / 2;
+        const baseSquareSize = Math.min(width, height) * 0.72;
 
         const now = timestamp;
         const allowMotion = !state.prefersReducedMotion;
@@ -302,9 +314,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        const size = sizeWithoutBreath * (1 + 0.08 * breathInfluence + 0.03 * pulseBoost);
-        const adjustedLeft = left + (sizeWithoutBreath - size) / 2;
-        const adjustedTop = top + (sizeWithoutBreath - size) / 2;
+        const size = baseSquareSize * (1 + 0.08 * breathInfluence + 0.03 * pulseBoost);
+        const adjustedLeft = (width - size) / 2;
+        const adjustedTop = (height - size) / 2;
         const points = [
             { x: adjustedLeft, y: adjustedTop + size },
             { x: adjustedLeft, y: adjustedTop },
@@ -318,8 +330,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const accentColor = phaseColors[phase] || '#f97316';
         const shouldShowTrail = allowMotion && showTrail;
-
-        ctx.clearRect(0, 0, width, height);
 
         const gradient = ctx.createRadialGradient(
             adjustedLeft + size / 2,
@@ -373,6 +383,11 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.restore();
     }
 
+    function updateCanvasVisibility() {
+        const shouldShow = state.hasStarted || state.sessionComplete;
+        canvas.classList.toggle('is-visible', shouldShow);
+    }
+
     function animate() {
         if (!state.isPlaying) return;
         const now = performance.now();
@@ -388,7 +403,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function render() {
         let html = `
-            <h1>Box Breathing</h1>
+            <div class="info-panel">
+                <h1>Box Breathing</h1>
         `;
         if (state.isPlaying) {
             html += `
@@ -485,7 +501,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
         }
+        html += `</div>`;
         app.innerHTML = html;
+
+        updateCanvasVisibility();
 
         if (!state.sessionComplete) {
             document.getElementById('toggle-play').addEventListener('click', togglePlay);
