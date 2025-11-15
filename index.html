@@ -11,7 +11,7 @@
         body {
             font-family: 'Helvetica Neue', Arial, sans-serif;
             margin: 0;
-            padding: 0;
+            padding: 2rem 1rem;
             background-color: black;
             color: #ffedd5;
             min-height: 100vh;
@@ -19,7 +19,8 @@
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            overflow: hidden;
+            box-sizing: border-box;
+            overflow-x: hidden;
         }
 
         /* Offline notification styles */
@@ -41,55 +42,67 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
-            min-height: 100vh;
-            padding: 1rem;
+            justify-content: space-between;
+            gap: 2rem;
+            width: min(560px, 100%);
+        }
+
+        #app-content {
             width: 100%;
-            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .info-panel {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1.5rem;
+            text-align: center;
+        }
+
+        .visual-wrapper {
+            position: relative;
+            width: min(420px, 90vw);
+            aspect-ratio: 1 / 1;
         }
 
         #box-canvas {
             position: absolute;
-            top: 0;
-            left: 0;
+            inset: 0;
             width: 100%;
             height: 100%;
-            z-index: 0;
+            opacity: 0;
+            transition: opacity 0.4s ease;
         }
 
-        #app-content {
-            position: relative;
-            z-index: 1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            width: 100%;
+        #box-canvas.is-visible {
+            opacity: 1;
         }
 
         h1 {
             font-size: 2.5rem;
             font-weight: bold;
-            margin-bottom: 4rem;
+            margin: 0;
             color: #fcd34d;
         }
 
         .instruction {
             font-size: 2rem;
-            margin-bottom: 2rem;
             color: #fdba74;
         }
 
         .countdown {
             font-size: 4rem;
             font-weight: bold;
-            margin-bottom: 2.5rem;
             color: #ff6b6b;
         }
 
         .phase-tracker {
             display: flex;
             gap: 1.5rem;
-            margin-bottom: 2rem;
             flex-wrap: wrap;
             justify-content: center;
         }
@@ -138,30 +151,26 @@
 
         .prompt {
             font-size: 1.5rem;
-            margin-bottom: 2rem;
             color: #fde68a;
         }
 
         .complete {
             font-size: 2rem;
-            margin-bottom: 2rem;
             color: #4ade80;
         }
 
         .limit-warning {
-            margin-bottom: 1.5rem;
             color: #f97316;
-            font-size: 1rem;
+            font-size: 0.95rem;
             letter-spacing: 0.05em;
             text-transform: uppercase;
         }
 
         .timer {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
             color: #fde68a;
-            z-index: 2;
+            align-self: flex-end;
+            width: 100%;
+            text-align: right;
         }
 
         .form-group {
@@ -175,7 +184,6 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            margin-bottom: 2rem;
             gap: 1rem;
         }
 
@@ -333,6 +341,32 @@
             cursor: pointer;
         }
 
+        @media (max-width: 600px) {
+            body {
+                padding: 1.5rem 1rem;
+            }
+
+            .container {
+                gap: 1.5rem;
+            }
+
+            .visual-wrapper {
+                width: min(360px, 92vw);
+            }
+
+            h1 {
+                font-size: 2.2rem;
+            }
+
+            .instruction {
+                font-size: 1.8rem;
+            }
+
+            .countdown {
+                font-size: 3.5rem;
+            }
+        }
+
         @media (prefers-reduced-motion: reduce) {
             .phase-item,
             .phase-dot,
@@ -350,8 +384,10 @@
     <div id="offline-notification" style="display: none;">You are offline, but the app will work normally</div>
 
     <div class="container">
-        <canvas id="box-canvas"></canvas>
         <div id="app-content"></div>
+        <div class="visual-wrapper" aria-hidden="true">
+            <canvas id="box-canvas"></canvas>
+        </div>
     </div>
 
     <script src="app.js"></script>
