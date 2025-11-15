@@ -19,9 +19,7 @@ document.addEventListener('DOMContentLoaded', () => {
         devicePixelRatio: Math.min(window.devicePixelRatio || 1, 2),
         viewportWidth: initialWidth,
         viewportHeight: initialHeight,
-        prefersReducedMotion: false,
-        hasStartedSession: false,
-        lastProgress: 0
+        prefersReducedMotion: false
     };
 
     let wakeLock = null;
@@ -47,7 +45,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const phaseColors = ['#f97316', '#fbbf24', '#38bdf8', '#22c55e'];
-    const phaseLabels = ['Inhale', 'Hold', 'Exhale', 'Wait'];
 
     function hexToRgba(hex, alpha) {
         const normalized = hex.replace('#', '');
@@ -56,19 +53,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const g = (bigint >> 8) & 255;
         const b = bigint & 255;
         return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    }
-
-    function clearCanvas() {
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-            return;
-        }
-        const width = canvas.width;
-        const height = canvas.height;
-        ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, width, height);
-        ctx.restore();
     }
 
     function resizeCanvas() {
@@ -85,31 +69,22 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.width = Math.floor(width * pixelRatio);
         canvas.height = Math.floor(height * pixelRatio);
 
-        if (state.isPlaying || state.sessionComplete || state.hasStartedSession) {
-            drawScene({
-                progress: state.sessionComplete ? 1 : state.lastProgress,
-                showTrail: state.isPlaying,
-                phase: state.count
-            });
-        } else {
-            clearCanvas();
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+            ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
         }
 
-        syncCanvasVisibility();
+        if (!state.isPlaying) {
+            drawScene({ progress: state.sessionComplete ? 1 : 0, showTrail: false, phase: state.count });
+        }
     }
 
     window.addEventListener('resize', resizeCanvas, { passive: true });
 
     function updateMotionPreference(event) {
         state.prefersReducedMotion = event.matches;
-        if (state.isPlaying || state.sessionComplete || state.hasStartedSession) {
-            drawScene({
-                progress: state.sessionComplete ? 1 : state.lastProgress,
-                showTrail: state.isPlaying,
-                phase: state.count
-            });
-        } else {
-            clearCanvas();
+        if (!state.isPlaying) {
+            drawScene({ progress: state.sessionComplete ? 1 : 0, showTrail: false, phase: state.count });
         }
     }
 
@@ -177,26 +152,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function syncCanvasVisibility() {
-        const shouldShowCanvas = state.isPlaying || state.sessionComplete || state.hasStartedSession;
-        canvas.classList.toggle('is-visible', shouldShowCanvas);
-        canvas.classList.toggle('is-hidden', !shouldShowCanvas);
-        if (!shouldShowCanvas) {
-            clearCanvas();
-        }
-    }
-
-    function getPausedProgress() {
-        const now = performance.now();
-        if (!lastStateUpdate) {
-            return state.lastProgress;
-        }
-        const elapsed = (now - lastStateUpdate) / 1000;
-        const effectiveCountdown = Math.max(0, state.countdown - elapsed);
-        const progress = (state.phaseTime - effectiveCountdown) / state.phaseTime;
-        return Math.max(0, Math.min(1, progress));
-    }
-
     function togglePlay() {
         state.isPlaying = !state.isPlaying;
         if (state.isPlaying) {
@@ -205,18 +160,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     console.log('AudioContext resumed');
                 });
             }
-            const startingFresh = !state.hasStartedSession || state.sessionComplete;
-            state.hasStartedSession = true;
-            if (startingFresh) {
-                state.totalTime = 0;
-                state.countdown = state.phaseTime;
-                state.count = 0;
-                state.sessionComplete = false;
-                state.timeLimitReached = false;
-                state.lastProgress = 0;
-            } else {
-                state.lastProgress = getPausedProgress();
-            }
+            state.totalTime = 0;
+            state.countdown = state.phaseTime;
+            state.count = 0;
+            state.sessionComplete = false;
+            state.timeLimitReached = false;
             state.pulseStartTime = performance.now();
             playTone();
             startInterval();
@@ -225,13 +173,10 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             clearInterval(interval);
             cancelAnimationFrame(animationFrameId);
-            const pausedProgress = getPausedProgress();
-            state.lastProgress = pausedProgress;
-            drawScene({ progress: pausedProgress, showTrail: false, phase: state.count });
+            drawScene({ progress: 0, showTrail: false, phase: state.count });
             state.pulseStartTime = null;
             releaseWakeLock();
         }
-        syncCanvasVisibility();
         render();
     }
 
@@ -244,13 +189,10 @@ document.addEventListener('DOMContentLoaded', () => {
         state.timeLimit = '';
         state.timeLimitReached = false;
         state.pulseStartTime = null;
-        state.hasStartedSession = false;
-        state.lastProgress = 0;
         clearInterval(interval);
         cancelAnimationFrame(animationFrameId);
-        clearCanvas();
+        drawScene({ progress: 0, showTrail: false, phase: state.count });
         releaseWakeLock();
-        syncCanvasVisibility();
         render();
     }
 
@@ -266,14 +208,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function startWithPreset(minutes) {
         state.timeLimit = minutes.toString();
         state.isPlaying = true;
-        state.hasStartedSession = true;
         state.totalTime = 0;
         state.countdown = state.phaseTime;
         state.count = 0;
         state.sessionComplete = false;
         state.timeLimitReached = false;
         state.pulseStartTime = performance.now();
-        state.lastProgress = 0;
         if (audioContext && audioContext.state === 'suspended') {
             audioContext.resume().then(() => {
                 console.log('AudioContext resumed');
@@ -301,7 +241,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 state.count = (state.count + 1) % 4;
                 state.pulseStartTime = performance.now();
                 state.countdown = state.phaseTime;
-                state.lastProgress = 0;
                 playTone();
                 if (state.count === 3 && state.timeLimitReached) {
                     state.sessionComplete = true;
@@ -309,7 +248,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     clearInterval(interval);
                     cancelAnimationFrame(animationFrameId);
                     releaseWakeLock();
-                    state.lastProgress = 1;
                 }
             } else {
                 state.countdown -= 1;
@@ -329,17 +267,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        if (!state.isPlaying && !state.sessionComplete && !state.hasStartedSession) {
-            clearCanvas();
-            return;
-        }
-
         const scale = state.devicePixelRatio || 1;
         ctx.save();
         ctx.setTransform(scale, 0, 0, scale, 0, 0);
 
         const clampedProgress = Math.max(0, Math.min(1, progress));
-        state.lastProgress = clampedProgress;
         const easedProgress = 0.5 - (Math.cos(Math.PI * clampedProgress) / 2);
         const baseSize = Math.min(width, height) * 0.5;
         const topMargin = 20;
@@ -450,176 +382,133 @@ document.addEventListener('DOMContentLoaded', () => {
         progress = Math.max(0, Math.min(1, progress));
 
         drawScene({ progress, timestamp: now });
-        state.lastProgress = progress;
 
         animationFrameId = requestAnimationFrame(animate);
     }
 
     function render() {
-        const showSessionUi = state.isPlaying || (state.hasStartedSession && !state.sessionComplete);
-        const showTimer = state.hasStartedSession && !state.sessionComplete;
-        const primaryLabel = state.isPlaying ? 'Pause' : (state.hasStartedSession ? 'Resume' : 'Start');
-
         let html = `
-            <div class="panel">
-                <div class="panel-header">
-                    <div class="title-block">
-                        <h1>Box Breathing</h1>
-                        ${!showSessionUi && !state.sessionComplete ? `<p class="subtitle">Balance your inhale, hold, exhale, and rest with a calm cadence.</p>` : ''}
-                    </div>
-                    ${showTimer ? `
-                        <div class="timer-pill">
-                            <span class="timer-label">Elapsed</span>
-                            <span class="timer-value">${formatTime(state.totalTime)}</span>
-                        </div>
-                    ` : ''}
-                </div>
+            <h1>Box Breathing</h1>
         `;
-
-        if (showSessionUi) {
+        if (state.isPlaying) {
             html += `
-                <div class="session-grid">
-                    <div class="session-card">
-                        <span class="section-label">Current phase</span>
-                        <span class="instruction">${getInstruction(state.count)}</span>
-                    </div>
-                    <div class="session-card countdown-card">
-                        <span class="section-label">Seconds left</span>
-                        <span class="countdown">${state.countdown}</span>
-                    </div>
-                </div>
-                <div class="phase-tracker" role="list">
+                <div class="timer">Total Time: ${formatTime(state.totalTime)}</div>
+                <div class="instruction">${getInstruction(state.count)}</div>
+                <div class="countdown">${state.countdown}</div>
             `;
-            phaseLabels.forEach((label, index) => {
+            const phases = ['Inhale', 'Hold', 'Exhale', 'Wait'];
+            html += `<div class="phase-tracker">`;
+            phases.forEach((label, index) => {
                 const phaseColor = phaseColors[index] || '#fde68a';
-                const softPhaseColor = hexToRgba(phaseColor, 0.18);
+                const softPhaseColor = hexToRgba(phaseColor, 0.25);
                 html += `
-                    <div class="phase-item ${index === state.count ? 'active' : ''}" role="listitem" style="--phase-color: ${phaseColor}; --phase-soft: ${softPhaseColor};">
-                        <span class="phase-dot">${index + 1}</span>
+                    <div class="phase-item ${index === state.count ? 'active' : ''}" style="--phase-color: ${phaseColor}; --phase-soft: ${softPhaseColor};">
+                        <span class="phase-dot"></span>
                         <span class="phase-label">${label}</span>
                     </div>
                 `;
             });
             html += `</div>`;
-        } else if (state.sessionComplete) {
+        }
+        if (state.timeLimitReached && !state.sessionComplete) {
+            const limitMessage = state.isPlaying ? 'Finishing current cycle…' : 'Time limit reached';
+            html += `<div class="limit-warning">${limitMessage}</div>`;
+        }
+        if (!state.isPlaying && !state.sessionComplete) {
             html += `
-                <div class="complete-block">
-                    <div class="complete-heading">Session complete</div>
-                    <p class="complete-copy">You spent ${formatTime(state.totalTime)} in a balanced breathing cycle. Tap below to reset.</p>
-                </div>
-            `;
-        } else {
-            html += `
-                <div class="intro-block">
-                    <p>Set your preferred pace and optional session length, then press start when you&apos;re ready.</p>
-                </div>
-                <div class="control-card">
-                    <div class="control-row toggle-row">
+                <div class="settings">
+                    <div class="form-group">
                         <label class="switch">
                             <input type="checkbox" id="sound-toggle" ${state.soundEnabled ? 'checked' : ''}>
                             <span class="slider"></span>
                         </label>
-                        <label class="toggle-label" for="sound-toggle">
+                        <label for="sound-toggle">
                             ${state.soundEnabled ? icons.volume2 : icons.volumeX}
-                            <span>${state.soundEnabled ? 'Sound on' : 'Sound off'}</span>
+                            Sound ${state.soundEnabled ? 'On' : 'Off'}
                         </label>
                     </div>
-                    <div class="control-row">
-                        <label class="field-label" for="time-limit">Time limit (minutes)</label>
+                    <div class="form-group">
                         <input
                             type="number"
                             inputmode="numeric"
-                            placeholder="Optional"
+                            placeholder="Time limit (minutes)"
                             value="${state.timeLimit}"
                             id="time-limit"
                             step="1"
                             min="0"
                         >
-                    </div>
-                    <div class="control-row">
-                        <label class="field-label" for="phase-time-slider">Phase length</label>
-                        <div class="range-wrapper">
-                            <input type="range" min="3" max="6" step="1" value="${state.phaseTime}" id="phase-time-slider">
-                            <span class="range-value" id="phase-time-value">${state.phaseTime}s</span>
-                        </div>
+                        <label for="time-limit">Minutes (optional)</label>
                     </div>
                 </div>
-                <div class="preset-grid">
-                    <button id="preset-2min" class="preset-button">${icons.clock}<span>2 min</span></button>
-                    <button id="preset-5min" class="preset-button">${icons.clock}<span>5 min</span></button>
-                    <button id="preset-10min" class="preset-button">${icons.clock}<span>10 min</span></button>
-                </div>
+                <div class="prompt">Press start to begin</div>
             `;
         }
-
-        if (state.timeLimitReached && !state.sessionComplete) {
-            const limitMessage = state.isPlaying ? 'Finishing current cycle…' : 'Time limit reached';
-            html += `<div class="limit-banner">${limitMessage}</div>`;
+        if (state.sessionComplete) {
+            html += `<div class="complete">Complete!</div>`;
         }
-
-        html += `
-                <div class="panel-actions">
-        `;
-
         if (!state.sessionComplete) {
             html += `
-                    <button id="toggle-play" class="primary-button">
-                        ${state.isPlaying ? icons.pause : icons.play}
-                        <span>${primaryLabel}</span>
-                    </button>
+                <button id="toggle-play">
+                    ${state.isPlaying ? icons.pause : icons.play}
+                    ${state.isPlaying ? 'Pause' : 'Start'}
+                </button>
             `;
         }
-
+        if (!state.isPlaying && !state.sessionComplete) {
+            html += `
+                <div class="slider-container">
+                    <label for="phase-time-slider">Phase Time (seconds): <span id="phase-time-value">${state.phaseTime}</span></label>
+                    <input type="range" min="3" max="6" step="1" value="${state.phaseTime}" id="phase-time-slider">
+                </div>
+            `;
+        }
         if (state.sessionComplete) {
             html += `
-                    <button id="reset-session" class="primary-button">
-                        ${icons.rotateCcw}
-                        <span>Back to start</span>
-                    </button>
+                <button id="reset">
+                    ${icons.rotateCcw}
+                    Back to Start
+                </button>
             `;
         }
-
-        html += `
+        if (!state.isPlaying && !state.sessionComplete) {
+            html += `
+                <div class="shortcut-buttons">
+                    <button id="preset-2min" class="preset-button">
+                        ${icons.clock} 2 min
+                    </button>
+                    <button id="preset-5min" class="preset-button">
+                        ${icons.clock} 5 min
+                    </button>
+                    <button id="preset-10min" class="preset-button">
+                        ${icons.clock} 10 min
+                    </button>
                 </div>
-            </div>
-        `;
-
+            `;
+        }
         app.innerHTML = html;
 
         if (!state.sessionComplete) {
-            const toggleButton = document.getElementById('toggle-play');
-            if (toggleButton) {
-                toggleButton.addEventListener('click', togglePlay);
-            }
+            document.getElementById('toggle-play').addEventListener('click', togglePlay);
         }
         if (state.sessionComplete) {
-            document.getElementById('reset-session').addEventListener('click', resetToStart);
+            document.getElementById('reset').addEventListener('click', resetToStart);
         }
-        if (!showSessionUi && !state.sessionComplete) {
+        if (!state.isPlaying && !state.sessionComplete) {
             document.getElementById('sound-toggle').addEventListener('change', toggleSound);
             const timeLimitInput = document.getElementById('time-limit');
             timeLimitInput.addEventListener('input', handleTimeLimitChange);
             const phaseTimeSlider = document.getElementById('phase-time-slider');
             phaseTimeSlider.addEventListener('input', function() {
-                state.phaseTime = parseInt(this.value, 10);
-                document.getElementById('phase-time-value').textContent = `${state.phaseTime}s`;
+                state.phaseTime = parseInt(this.value);
+                document.getElementById('phase-time-value').textContent = state.phaseTime;
             });
             document.getElementById('preset-2min').addEventListener('click', () => startWithPreset(2));
             document.getElementById('preset-5min').addEventListener('click', () => startWithPreset(5));
             document.getElementById('preset-10min').addEventListener('click', () => startWithPreset(10));
         }
-
-        if (state.isPlaying || state.sessionComplete || state.hasStartedSession) {
-            drawScene({
-                progress: state.sessionComplete ? 1 : state.lastProgress,
-                phase: state.count,
-                showTrail: state.isPlaying
-            });
-        } else {
-            clearCanvas();
+        if (!state.isPlaying) {
+            drawScene({ progress: state.sessionComplete ? 1 : 0, phase: state.count, showTrail: false });
         }
-
-        syncCanvasVisibility();
     }
 
     resizeCanvas();
