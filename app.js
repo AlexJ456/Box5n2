@@ -60,6 +60,14 @@ document.addEventListener('DOMContentLoaded', () => {
         return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     }
 
+    let cachedGradient = null;
+    let cachedGradientKey = '';
+
+    function invalidateGradient() {
+        cachedGradient = null;
+        cachedGradientKey = '';
+    }
+
     function resizeCanvas() {
         const currentSizingElement = layoutHost || document.body;
         if (!currentSizingElement) {
@@ -83,6 +91,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ctx) {
             ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
         }
+
+        invalidateGradient();
 
         if (!state.isPlaying) {
             drawScene({ progress: state.sessionComplete ? 1 : 0, showTrail: false, phase: state.count });
@@ -113,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
-        const secs = seconds % 60;
+        the secs = seconds % 60;
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
 
@@ -277,9 +287,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1000);
     }
 
-    let cachedGradient = null;
-    let cachedGradientKey = '';
-
     function drawScene({ progress = 0, phase = state.count, showTrail = state.isPlaying, timestamp = performance.now() } = {}) {
         if (!ctx) return;
 
@@ -296,6 +303,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.clearRect(0, 0, width, height);
 
         if (!state.hasStarted && !state.sessionComplete) {
+            invalidateGradient();
             ctx.restore();
             return;
         }
@@ -424,8 +432,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function render() {
         let html = `
-            <div class="info-panel">
-                <h1>Box Breathing</h1>
+            <h1>Box Breathing</h1>
         `;
         if (state.isPlaying) {
             html += `
@@ -522,7 +529,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             `;
         }
-        html += `</div>`;
         app.innerHTML = html;
 
         updateCanvasVisibility();
