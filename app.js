@@ -442,6 +442,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="instruction">${getInstruction(state.count)}</div>
                 <div class="countdown">${state.countdown}</div>
             `;
+            const phases = ['Inhale', 'Hold', 'Exhale', 'Wait'];
+            html += `<div class="phase-tracker">`;
+            phases.forEach((label, index) => {
+                const phaseColor = phaseColors[index] || '#fde68a';
+                const softPhaseColor = hexToRgba(phaseColor, 0.25);
+                html += `
+                    <div class="phase-item ${index === state.count ? 'active' : ''}" style="--phase-color: ${phaseColor}; --phase-soft: ${softPhaseColor};">
+                        <span class="phase-dot"></span>
+                        <span class="phase-label">${label}</span>
+                    </div>
+                `;
+            });
+            html += `</div>`;
         }
         if (state.timeLimitReached && !state.sessionComplete) {
             const limitMessage = state.isPlaying ? 'Finishing current cycle…' : 'Time limit reached';
