@@ -123,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
-        the secs = seconds % 60;
+        const secs = seconds % 60;
         return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
     }
 
@@ -200,6 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.sessionComplete = false;
             state.timeLimitReached = false;
             state.hasStarted = false;
+            invalidateGradient();
             drawScene({ progress: 0, showTrail: false, phase: state.count });
             state.pulseStartTime = null;
             releaseWakeLock();
@@ -219,6 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.hasStarted = false;
         clearInterval(interval);
         cancelAnimationFrame(animationFrameId);
+        invalidateGradient();
         drawScene({ progress: 0, showTrail: false, phase: state.count });
         releaseWakeLock();
         render();
@@ -440,19 +442,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 <div class="instruction">${getInstruction(state.count)}</div>
                 <div class="countdown">${state.countdown}</div>
             `;
-            const phases = ['Inhale', 'Hold', 'Exhale', 'Wait'];
-            html += `<div class="phase-tracker">`;
-            phases.forEach((label, index) => {
-                const phaseColor = phaseColors[index] || '#fde68a';
-                const softPhaseColor = hexToRgba(phaseColor, 0.25);
-                html += `
-                    <div class="phase-item ${index === state.count ? 'active' : ''}" style="--phase-color: ${phaseColor}; --phase-soft: ${softPhaseColor};">
-                        <span class="phase-dot"></span>
-                        <span class="phase-label">${label}</span>
-                    </div>
-                `;
-            });
-            html += `</div>`;
         }
         if (state.timeLimitReached && !state.sessionComplete) {
             const limitMessage = state.isPlaying ? 'Finishing current cycle…' : 'Time limit reached';
@@ -557,6 +546,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    resizeCanvas();
     render();
+    resizeCanvas();
 });
